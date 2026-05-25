@@ -13,6 +13,8 @@
 \usepackage{listings}
 \usepackage[portuguese]{babel}
 \usepackage[utf8]{inputenc}
+\usepackage[hidelinks]{hyperref}
+\graphicspath{{./figs/}}
 \def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
     T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
 
@@ -73,6 +75,11 @@ marcos.assuncao@ubi.pt}
 
 \maketitle
 
+\IEEEpubidadjcol
+\renewcommand{\thefootnote}{}
+\footnotetext{Código-fonte e \textit{scripts} de teste disponíveis em \url{https://github.com/enriconunes/serverless-function-ubi}.}
+\renewcommand{\thefootnote}{\arabic{footnote}}
+
 \begin{abstract}
 A computação \textit{serverless} eliminou a fronteira entre escrever uma função e disponibilizá-la na Internet, transferindo para o fornecedor de nuvem a responsabilidade de provisionar, escalar e manter a infraestrutura. Este trabalho concretiza essa abordagem implementando uma função que devolve todos os números primos inferiores a $n$, exposta como \textit{endpoint} HTTP através das \textit{Edge Functions} do Supabase. A função é escrita em TypeScript sobre o \textit{runtime} Deno e implantada na \textit{edge network} do fornecedor. O relatório descreve o conceito de \textit{Function as a Service}, compara as principais plataformas do mercado, justifica a escolha do Supabase e detalha o processo de desenvolvimento e \textit{deployment}, incluindo o algoritmo utilizado.
 \end{abstract}
@@ -84,7 +91,7 @@ A computação \textit{serverless} eliminou a fronteira entre escrever uma funç
 %=================================================================
 \section{Introdução}
 %=================================================================
-Durante a última década, a forma como o software é executado em nuvem deslocou-se progressivamente do servidor para a função. Onde antes era necessário aprovisionar uma máquina virtual e mantê-la em execução à espera de pedidos, hoje basta enviar uma função para uma plataforma que se encarrega de a invocar quando, e apenas quando, alguém a chama. Este modelo, designado \textit{serverless}, não significa a ausência de servidores; significa apenas que estes deixam de fazer parte do modelo mental do programador \cite{baldini2017}.
+Durante a última década, a forma como o software é executado em nuvem deslocou-se progressivamente do servidor para a função. Onde antes era necessário aprovisionar uma máquina virtual e mantê-la em execução à espera de pedidos, hoje basta enviar uma função para uma plataforma que se encarrega de a invocar quando, e apenas quando, alguém a chama. Este modelo, designado \textit{serverless}, não significa a ausência de servidores; significa apenas que estes deixam de fazer parte do modelo mental do programador \cite{baldini2017,castro2019}.
 
 Neste trabalho concretiza-se um caso de uso simples mas suficientemente ilustrativo: uma função que recebe um número natural $n$ e devolve todos os primos inferiores ou iguais a $n$. A escolha do problema é deliberada. O cálculo é puramente determinístico e dependente de CPU, sem acessos a base de dados nem dependências externas, o que permite que a medição posterior de latência e \textit{cold start} reflita o comportamento da plataforma e não o de serviços auxiliares.
 
@@ -101,9 +108,9 @@ Dentro deste paradigma, \textit{Function as a Service} (FaaS) é a forma de expo
 
 \textbf{Pagamento por uso.} A cobrança incide sobre o número de invocações e sobre o produto entre tempo de execução e memória alocada. Picos de utilização e funções pouco invocadas têm um custo proporcional, sem o desperdício de máquinas semipreenchidas.
 
-\textbf{Ausência de estado.} Como uma função pode ser executada em qualquer instância e desaparecer assim que termina, o estado tem de residir noutro local — uma base de dados, uma cache distribuída ou um sistema de mensagens. Esta restrição condiciona o desenho das aplicações, mas é também o que torna possível a escalabilidade horizontal sem coordenação explícita.
+\textbf{Ausência de estado.} Como uma função pode ser executada em qualquer instância e desaparecer assim que termina, o estado tem de residir noutro local — uma base de dados, uma cache distribuída ou um sistema de mensagens. Esta restrição condiciona o desenho das aplicações, mas é também o que torna possível a escalabilidade horizontal sem coordenação explícita \cite{jonas2019,hellerstein2019}.
 
-O preço a pagar é o \textit{cold start}: quando não existe nenhuma instância pronta a servir o pedido, a plataforma tem de aprovisionar um \textit{sandbox}, carregar o código e inicializar o \textit{runtime} antes de invocar a função. Este atraso, tipicamente entre dezenas e poucas centenas de milissegundos consoante a plataforma e o tamanho do código, é o principal indicador de qualidade de uma oferta FaaS e será objeto da análise da Secção~V.
+O preço a pagar é o \textit{cold start}: quando não existe nenhuma instância pronta a servir o pedido, a plataforma tem de aprovisionar um \textit{sandbox}, carregar o código e inicializar o \textit{runtime} antes de invocar a função \cite{wang2018,manner2018}. Este atraso, tipicamente entre dezenas e poucas centenas de milissegundos consoante a plataforma e o tamanho do código \cite{shahrad2020}, é o principal indicador de qualidade de uma oferta FaaS e será objeto da análise da Secção~V.
 
 A Figura~\ref{fig:faas} resume o ciclo de vida de um pedido neste modelo.
 
@@ -145,7 +152,7 @@ O mercado FaaS está hoje consolidado em torno de um conjunto reduzido de oferta
 
 \textbf{IBM Cloud Code Engine \cite{ibmcodeengine}.} Plataforma assente em Knative e Kubernetes, executa tanto funções como \textit{containers} de longa duração. A flexibilidade do modelo é simultaneamente vantagem e desvantagem: requer um pouco mais de configuração inicial do que as alternativas estritamente FaaS.
 
-\textbf{Supabase Edge Functions \cite{supabase}.} A oferta de funções da Supabase distingue-se em três pontos. Primeiro, corre na \textit{edge network} da Deno Deploy, com pontos de presença distribuídos geograficamente, o que aproxima a execução do utilizador. Segundo, o \textit{runtime} é Deno, não Node.js, com APIs alinhadas com os padrões da Web (\texttt{Request}, \texttt{Response}, \texttt{fetch}). Terceiro, integra-se de raiz com os restantes serviços da plataforma (Postgres, \textit{Auth}, \textit{Storage}), o que reduz a fricção em aplicações que já a usem.
+\textbf{Supabase Edge Functions \cite{supabase}.} A oferta de funções da Supabase distingue-se em três pontos. Primeiro, corre na \textit{edge network} da Deno Deploy, com pontos de presença distribuídos geograficamente, o que aproxima a execução do utilizador e reduz a latência ponta-a-ponta \cite{satya2017,shi2016}. Segundo, o \textit{runtime} é Deno, não Node.js, com APIs alinhadas com os padrões da Web (\texttt{Request}, \texttt{Response}, \texttt{fetch}). Terceiro, integra-se de raiz com os restantes serviços da plataforma (Postgres, \textit{Auth}, \textit{Storage}), o que reduz a fricção em aplicações que já a usem.
 
 \begin{table}[t]
 \caption{Comparação sintética das plataformas FaaS consideradas.}
@@ -176,7 +183,7 @@ Esta secção justifica a escolha do Supabase para o trabalho, descreve o \texti
 A escolha recaiu sobre as \textit{Edge Functions} do Supabase por três razões. A primeira é de carácter operacional: o registo é imediato, o \textit{deployment} faz-se com um único comando da CLI e o plano gratuito é generoso para o âmbito de um trabalho académico. A segunda é técnica: a execução em \textit{edge}, geograficamente próxima do cliente, é particularmente interessante para o estudo de latência proposto no enunciado, dado que reduz a componente de propagação na rede e isola melhor o tempo gasto pela função propriamente dita. A terceira é a clareza do modelo de programação: o \textit{runtime} Deno expõe APIs web-standard e dispensa o aparato de \texttt{package.json}, \texttt{node\_modules} e ferramentas de \textit{build}, o que torna o código mais legível e o ciclo de desenvolvimento mais curto.
 
 \subsection{Deno como \textit{Runtime} de Execução}
-O Deno é um \textit{runtime} de JavaScript e TypeScript criado por Ryan Dahl em 2018, sete anos depois de o mesmo autor ter iniciado o projeto Node.js. Surge como resposta a um conjunto de decisões de desenho de Node consideradas desadequadas em retrospetiva, e materializa três escolhas centrais.
+O Deno \cite{deno} é um \textit{runtime} de JavaScript e TypeScript criado por Ryan Dahl em 2018, sete anos depois de o mesmo autor ter iniciado o projeto Node.js. Surge como resposta a um conjunto de decisões de desenho de Node consideradas desadequadas em retrospetiva, e materializa três escolhas centrais.
 
 \textbf{TypeScript nativo.} O Deno executa ficheiros \texttt{.ts} diretamente, sem fase explícita de compilação por parte do programador. Tipos e código produtivo coexistem no mesmo ficheiro, o que reduz a fricção do desenvolvimento.
 
@@ -290,7 +297,7 @@ https://uuvyutktcuhpwlltquii.supabase.co\\/functions/v1/primes
 \end{center}
 
 \subsection{Validação Funcional}
-A validação foi realizada com o Insomnia, escolhido pela facilidade em guardar coleções de pedidos reutilizáveis ao longo da fase de testes. Adotou-se uma estratégia em dois passos para isolar eventuais problemas de configuração de eventuais problemas no código da função.
+A validação foi realizada com o Insomnia \cite{insomnia}, cliente HTTP gráfico escolhido pela facilidade em guardar coleções de pedidos reutilizáveis ao longo da fase de testes. Adotou-se uma estratégia em dois passos para isolar eventuais problemas de configuração de eventuais problemas no código da função.
 
 Primeiro, executou-se um pedido de controlo contra a função \texttt{hello-world}, que vem pré-instalada com o projeto e cuja correção é conhecida. O sucesso desse pedido confirmou que a chave de API, o \textit{endpoint} base e as definições gerais do Insomnia estavam corretas.
 
@@ -326,25 +333,144 @@ A resposta obtida (HTTP 200) é apresentada no Listing~\ref{lst:resp} e correspo
 %=================================================================
 \section{Análise de Desempenho}
 %=================================================================
-% [A preencher: metodologia experimental, ferramentas de teste de carga,
-%  resultados de latência em pedidos sequenciais e concorrentes, medição
-%  do cold start, gráficos e discussão.]
+A avaliação experimental incidiu sobre os três indicadores pedidos no enunciado: latência sequencial, latência em utilização concorrente e \textit{cold start}. O estudo foi conduzido em duas etapas distintas e independentes. Na primeira, a \textbf{geração de dados}, foram efetuados pedidos reais contra a função em produção, com os tempos de resposta gravados em ficheiro. Na segunda, a \textbf{análise}, esses ficheiros são lidos por um \textit{script} Python (\texttt{pandas} e \texttt{matplotlib}) que calcula percentis e produz os gráficos apresentados. Esta separação permite repetir a análise sobre os mesmos dados sem refazer a campanha de testes.
+
+\subsection{Métricas e Notação Estatística}
+A latência foi sempre medida ponto-a-ponto: tempo decorrido entre o envio do pedido HTTP e a receção completa da resposta. Esta inclui propagação de rede, eventual \textit{cold start} e execução do crivo, sendo aquilo que o utilizador final efetivamente perceciona.
+
+Por se tratar de distribuições assimétricas e com cauda longa, médias por si só são enganadoras: basta um pedido lento para puxar a média para cima. Reportam-se por isso \textit{percentis}, com a seguinte interpretação:
+\begin{itemize}
+  \item \textbf{p50} (mediana): 50\% dos pedidos foram \emph{mais rápidos} que este valor; representa o caso típico.
+  \item \textbf{p95}: 95\% dos pedidos foram mais rápidos que este valor; apenas 5\% — a cauda lenta — ultrapassaram. Mede o ``pior comum''.
+  \item \textbf{p99}: análogo, mas isolando o 1\% pior. Útil para detetar \textit{outliers} pontuais (\textit{cold starts} esporádicos, retransmissões TCP, \textit{rate limiting}).
+\end{itemize}
+
+\subsection{Ferramentas de Geração de Dados}
+Duas ferramentas foram utilizadas, consoante a natureza da medição.
+
+Para a latência sequencial e concorrente recorreu-se ao \textbf{k6} \cite{k6}, motor de \textit{load testing} da Grafana com modelo nativo de utilizadores virtuais (VUs) e rampas de carga programáveis. O \textit{script} \texttt{tests/load.js} corre dois cenários: \texttt{sequential}, com 1 VU e 1000 iterações encadeadas, e \texttt{concurrent}, com uma rampa de 1\,$\rightarrow$\,5\,$\rightarrow$\,10\,$\rightarrow$\,25\,$\rightarrow$\,50\,$\rightarrow$\,100 VUs ao longo de seis \textit{stages} de 30 segundos.
+
+Para o \textit{cold start}, o k6 não é adequado porque mantém ligações TCP/TLS persistentes que impedem o \textit{worker} de ser efetivamente reciclado. Usou-se em alternativa um \textit{script} PowerShell (\texttt{tests/coldstart.ps1}) que faz \textbf{uma requisição a cada 15 minutos, durante 10 vezes}. Esse intervalo aproxima-se do tempo após o qual os \textit{workers} de Deno Deploy são reciclados por inatividade, pelo que o pedido seguinte paga, de facto, o custo de provisionamento do \textit{sandbox}. Imediatamente após cada pedido \textit{cold}, é feito um segundo pedido \textit{warm} para servir de \textit{baseline} comparável na mesma máquina, na mesma rede e no mesmo instante.
+
+\subsection{Latência Sequencial}
+O cenário sequencial mede a latência ``limpa'' da função, sem contenção, com o \textit{worker} aquecido. A Tabela~\ref{tab:seq} sintetiza os resultados.
+
+\begin{table}[t]
+\caption{Latência sequencial (1 VU, 1000 iterações).}
+\label{tab:seq}
+\centering
+\renewcommand{\arraystretch}{1.15}
+\footnotesize
+\begin{tabular}{@{}lrrrrrr@{}}
+\toprule
+\textbf{n} & \textbf{min} & \textbf{p50} & \textbf{média} & \textbf{p95} & \textbf{p99} & \textbf{max} \\
+\midrule
+1000 & 46\,ms & 67\,ms & 102\,ms & 226\,ms & 259\,ms & 1844\,ms \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+A mediana de 67\,ms corresponde ao caso típico e é dominada pelo \textit{round-trip} de rede até ao ponto de presença mais próximo da \textit{edge network}. O valor mínimo (46\,ms) representa o melhor caso possível a partir do ponto de origem dos testes. A diferença marcada entre a média (102\,ms) e a mediana (67\,ms) revela a presença de \textit{outliers}: o valor máximo de 1844\,ms é, com elevada probabilidade, o primeiro pedido do teste, executado contra um \textit{worker} ainda frio. Este efeito justifica o estudo dedicado da Secção~V-F.
+
+\subsection{Latência em Utilização Concorrente}
+A Figura~\ref{fig:lat-time} mostra a evolução temporal dos três percentis ao longo da rampa de VUs. As linhas verticais a tracejado marcam a fronteira entre \textit{stages}, anotadas com o número de VUs alvo no final de cada um.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\columnwidth]{latency_concurrent.png}
+\caption{Latência ao longo do tempo durante a rampa de utilizadores virtuais. Cada linha vertical separa um \textit{stage} (30\,s) e indica o nível de VUs concorrentes nessa janela.}
+\label{fig:lat-time}
+\end{figure}
+
+\textbf{Como interpretar:} cada ponto é o valor de um percentil agregado numa janela de 5 segundos. A linha verde (p50) descreve o pedido típico em cada instante; mantém-se aproximadamente constante porque metade dos pedidos não compete por recursos. A linha laranja (p95) e a vermelha (p99) representam a cauda — começam a separar-se da mediana à medida que a concorrência cresce, sinal de que uma minoria de pedidos passa a esperar atrás de outros.
+
+A Figura~\ref{fig:lat-stages} agrega os mesmos dados por \textit{stage}, permitindo comparar de forma direta cada nível de concorrência.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\columnwidth]{latency_stages.png}
+\caption{Latência (p50, p95, p99) agregada por \textit{stage} da rampa de concorrência. Cada grupo de três barras corresponde a uma janela de 30\,s com o nível de VUs indicado no eixo horizontal.}
+\label{fig:lat-stages}
+\end{figure}
+
+\textbf{Como interpretar:} as barras verdes (p50) crescem pouco entre \textit{stages}, o que sugere que o caso típico se mantém estável mesmo com 100 utilizadores em paralelo. As barras laranja e vermelha (p95, p99) crescem de forma mais visível, sobretudo na transição para 100 VUs, indicando que a degradação se concentra na cauda da distribuição. A Tabela~\ref{tab:conc} resume os valores globais agregados sobre toda a rampa.
+
+\begin{table}[t]
+\caption{Latência concorrente, agregada sobre toda a rampa (77\,497 pedidos).}
+\label{tab:conc}
+\centering
+\renewcommand{\arraystretch}{1.15}
+\footnotesize
+\begin{tabular}{@{}lrrrrrr@{}}
+\toprule
+\textbf{n} & \textbf{min} & \textbf{p50} & \textbf{média} & \textbf{p95} & \textbf{p99} & \textbf{max} \\
+\midrule
+77\,497 & 42\,ms & 64\,ms & 72\,ms & 113\,ms & 187\,ms & 9442\,ms \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{Observação não trivial:} os p50 e p95 do cenário concorrente são \emph{inferiores} aos do cenário sequencial. Isto é contra-intuitivo apenas à primeira leitura: como o cenário sequencial arrancou ``frio'', a sua amostra inclui o custo inicial de aquecimento dos \textit{workers}; o cenário concorrente, que corre depois, encontrou tudo pronto. O fenómeno confirma na prática a tese central do modelo: a plataforma aprovisiona capacidade sob procura e amortiza-a enquanto houver tráfego \cite{shahrad2020}. O valor máximo de 9442\,ms reflete uma pequena fração de pedidos (0{,}53\%) que apanharam \textit{rate limiting} (HTTP 429) ou reciclagem de \textit{worker} durante o pico, e não a operação normal.
+
+\subsection{Cold Start}
+O \textit{cold start} foi medido com a metodologia descrita na Secção~V-C: dez pares de pedidos (\textit{cold} + \textit{warm}), separados por intervalos de 15 minutos. A Figura~\ref{fig:cold} apresenta o resultado iteração a iteração.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\columnwidth]{cold_start.png}
+\caption{Latência de \textit{cold start} (barra vermelha) versus \textit{warm} (barra verde) ao longo de 10 iterações espaçadas por 15 minutos. A diferença vertical entre as duas barras de uma mesma iteração corresponde ao custo de provisionamento do \textit{sandbox} Deno.}
+\label{fig:cold}
+\end{figure}
+
+\textbf{Como interpretar:} cada par de barras corresponde a uma iteração do \textit{script}. A barra vermelha mede a latência total quando o \textit{worker} foi previamente reciclado (\textit{cold}); a barra verde mede o pedido seguinte, feito segundos depois sobre o \textit{worker} já provisionado (\textit{warm}). A diferença entre as duas é a melhor aproximação ao \textbf{custo de \textit{cold start}} — isto é, ao tempo extra que a primeira invocação paga por carregar o código e inicializar o \textit{runtime} Deno \cite{wang2018,manner2018}.
+
+Verifica-se que as barras \textit{warm} são sistematicamente baixas e consistentes entre iterações, alinhando-se com a mediana do cenário sequencial aquecido. As barras \textit{cold}, em contrapartida, são várias vezes superiores. Esta penalização, observável de forma reproduzível ao longo das 10 iterações, é o trade-off direto do modelo \textit{serverless}: o utilizador beneficia da elasticidade total (incluindo escala a zero, sem custo em períodos inativos), mas paga, no primeiro pedido após inatividade, o tempo de provisionamento. Para aplicações sensíveis ao primeiro pedido, esta latência pode ser mitigada por mecanismos de \textit{warm-up} programado ou de \textit{provisioned concurrency}, ausentes do plano \textit{free} do Supabase mas comuns nas plataformas concorrentes \cite{shahrad2020}.
 
 %=================================================================
 \section{Conclusões}
 %=================================================================
-% [A preencher.]
+Este trabalho concretizou uma função \textit{serverless} para a geração de números primos inferiores a $n$, implantada nas \textit{Edge Functions} do Supabase e exposta como \textit{endpoint} HTTP global. A escolha da plataforma — justificada pela combinação de \textit{runtime} Deno, distribuição em \textit{edge} e fricção mínima de \textit{deployment} — provou ser adequada ao escopo académico e à medição experimental pretendida.
 
-\newpage
+A análise quantitativa mostrou que, em regime de função aquecida, a latência mediana ronda os 65\,ms, dominada essencialmente pelo \textit{round-trip} de rede. A função escala de forma quase plana até 100 VUs concorrentes, com a maior parte da degradação a manifestar-se apenas na cauda da distribuição (p95 e p99). O \textit{cold start}, medido em condições controladas, revelou-se reproduzível e várias vezes superior à latência \textit{warm} — confirmando que continua a ser o principal compromisso do modelo FaaS.
+
+Como trabalho futuro, valeria a pena comparar estes resultados com outra plataforma (por exemplo, Azure Functions), variar o valor de $n$ para isolar a contribuição do trabalho CPU, e explorar estratégias de mitigação de \textit{cold start} disponíveis em planos pagos do Supabase.
+
 \begin{thebibliography}{00}
-% [A preencher: referências formatadas no estilo IEEE.]
-% \bibitem{baldini2017} ...
-% \bibitem{jonas2019} ...
-% \bibitem{supabase} ...
-% \bibitem{supabasequickstart} ...
-% \bibitem{azurefunctions} ...
-% \bibitem{ibmcodeengine} ...
-% \bibitem{firebasefunctions} ...
+
+\bibitem{baldini2017} I. Baldini \textit{et al.}, ``Serverless computing: Current trends and open problems,'' in \textit{Research Advances in Cloud Computing}, S. Chaudhary, G. Somani, R. Buyya, Eds. Singapore: Springer, 2017, pp. 1--20. doi: 10.1007/978-981-10-5026-8\_1.
+
+\bibitem{jonas2019} E. Jonas \textit{et al.}, ``Cloud programming simplified: A Berkeley view on serverless computing,'' EECS Dept., Univ. California, Berkeley, Tech. Rep. UCB/EECS-2019-3, Feb. 2019. [Online]. Disponível: \url{https://www2.eecs.berkeley.edu/Pubs/TechRpts/2019/EECS-2019-3.html}
+
+\bibitem{castro2019} P. Castro, V. Ishakian, V. Muthusamy, e A. Slominski, ``The rise of serverless computing,'' \textit{Communications of the ACM}, vol. 62, n.º 12, pp. 44--54, dez. 2019. doi: 10.1145/3368454.
+
+\bibitem{hellerstein2019} J. M. Hellerstein \textit{et al.}, ``Serverless computing: One step forward, two steps back,'' in \textit{Proc. 9th Biennial Conf. Innovative Data Systems Research (CIDR)}, Asilomar, CA, USA, jan. 2019.
+
+\bibitem{wang2018} L. Wang, M. Li, Y. Zhang, T. Ristenpart, e M. Swift, ``Peeking behind the curtains of serverless platforms,'' in \textit{Proc. USENIX Annual Technical Conf. (ATC)}, Boston, MA, USA, 2018, pp. 133--146.
+
+\bibitem{manner2018} J. Manner, M. Endreß, T. Heckel, e G. Wirtz, ``Cold start influencing factors in function as a service,'' in \textit{Proc. IEEE/ACM Int. Conf. Utility and Cloud Computing Companion (UCC Companion)}, Zurich, Switzerland, 2018, pp. 181--188. doi: 10.1109/UCC-Companion.2018.00054.
+
+\bibitem{shahrad2020} M. Shahrad \textit{et al.}, ``Serverless in the wild: Characterizing and optimizing the serverless workload at a large cloud provider,'' in \textit{Proc. USENIX Annual Technical Conf. (ATC)}, 2020, pp. 205--218.
+
+\bibitem{satya2017} M. Satyanarayanan, ``The emergence of edge computing,'' \textit{Computer}, vol. 50, n.º 1, pp. 30--39, jan. 2017. doi: 10.1109/MC.2017.9.
+
+\bibitem{shi2016} W. Shi, J. Cao, Q. Zhang, Y. Li, e L. Xu, ``Edge computing: Vision and challenges,'' \textit{IEEE Internet of Things Journal}, vol. 3, n.º 5, pp. 637--646, out. 2016. doi: 10.1109/JIOT.2016.2579198.
+
+\bibitem{supabase} Supabase, ``Edge Functions,'' 2026. [Online]. Disponível: \url{https://supabase.com/}
+
+\bibitem{supabasequickstart} Supabase, ``Edge Functions Quickstart,'' 2026. [Online]. Disponível: \url{https://supabase.com/docs/guides/functions/quickstart}
+
+\bibitem{deno} Deno Land Inc., ``Deno --- A modern runtime for JavaScript and TypeScript,'' 2026. [Online]. Disponível: \url{https://deno.com/}
+
+\bibitem{k6} Grafana Labs, ``k6: Modern load testing for developers and testers,'' 2026. [Online]. Disponível: \url{https://k6.io/}
+
+\bibitem{insomnia} Kong Inc., ``Insomnia API Client,'' 2026. [Online]. Disponível: \url{https://insomnia.rest/}
+
+\bibitem{azurefunctions} Microsoft Azure, ``Azure Functions,'' 2026. [Online]. Disponível: \url{https://azure.microsoft.com/pt-pt/products/functions/}
+
+\bibitem{ibmcodeengine} IBM Cloud, ``IBM Cloud Code Engine documentation,'' 2026. [Online]. Disponível: \url{https://cloud.ibm.com/docs/codeengine}
+
+\bibitem{firebasefunctions} Google, ``Cloud Functions for Firebase,'' 2026. [Online]. Disponível: \url{https://firebase.google.com/docs/functions}
+
 \end{thebibliography}
 
 \end{document}
