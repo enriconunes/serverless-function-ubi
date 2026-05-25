@@ -1,0 +1,48 @@
+# ---------- Dados de teste (gerados localmente, podem ser muito grandes) ----------
+tests/load.json
+tests/coldstart.csv
+tests/out/
+tests/.env.ps1
+
+# ---------- LaTeX build artifacts ----------
+relatorio/*.aux
+relatorio/*.log
+relatorio/*.out
+relatorio/*.toc
+relatorio/*.bbl
+relatorio/*.blg
+relatorio/*.synctex.gz
+relatorio/*.fls
+relatorio/*.fdb_latexmk
+
+# Manter o PDF final do relatório (descomenta a linha abaixo para o ignorar)
+# relatorio/*.pdf
+
+# Versões antigas do PDF (do exemplo)
+supabase/exemplo-relatorio/*.aux
+supabase/exemplo-relatorio/*.log
+supabase/exemplo-relatorio/*.out
+
+# ---------- Supabase ----------
+supabase/.temp/
+supabase/.branches/
+
+# ---------- Segredos / variáveis de ambiente ----------
+.env
+.env.local
+*.env
+
+# ---------- Sistema operativo ----------
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+.DS_Store
+
+# ---------- Editores ----------
+.idea/
+*.swp
+*.swo
+
+# ---------- Node / Deno (caso apareça) ----------
+node_modules/
+.deno/

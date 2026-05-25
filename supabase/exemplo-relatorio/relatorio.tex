@@ -1,0 +1,311 @@
+\documentclass[conference]{IEEEtran}
+\IEEEoverridecommandlockouts
+\usepackage{cite}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{algorithmic}
+\usepackage{graphicx}
+\usepackage{textcomp}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{tikz}
+\usetikzlibrary{shapes.geometric, arrows.meta, positioning, fit, backgrounds}
+\usepackage[portuguese]{babel}
+\usepackage[utf8]{inputenc}
+\def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
+    T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
+\begin{document}
+
+\title{Docker e Kubernetes: Análise Comparativa\\ de Aplicabilidade na Gestão de \textit{Containers}}
+
+\author{\IEEEauthorblockN{1\textsuperscript{st} Enrico Nunes}
+\IEEEauthorblockA{\textit{Mestrado em Engenharia Informática}\\
+\textit{Universidade da Beira Interior}\\
+Covilhã, Portugal\\
+enrico.nunes@ubi.pt}
+\and
+\IEEEauthorblockN{2\textsuperscript{nd} Marcos Assunção}
+\IEEEauthorblockA{\textit{Mestrado em Engenharia Informática}\\
+\textit{Universidade da Beira Interior}\\
+Covilhã, Portugal\\
+marcos.assuncao@ubi.pt}
+}
+
+\maketitle
+
+\begin{abstract}
+A gestão de \textit{containers} é hoje essencial nas arquiteturas de nuvem. Embora Docker e Kubernetes sejam frequentemente encarados como concorrentes, atuam em camadas distintas e complementares: empacotamento e orquestração. Este artigo desmistifica esta relação através de uma análise comparativa prática, focada na usabilidade, desempenho, escalabilidade e custos operacionais. Conclui-se que as duas ferramentas raramente se excluem; a adoção de uma ou de ambas deve ser sempre guiada pela escala do projeto, pelas necessidades de automatização e pela maturidade técnica da equipa.
+\end{abstract}
+
+\begin{IEEEkeywords}
+\textit{Containers}, Docker, Kubernetes, Orquestração, Computação na Nuvem, Microsserviços.
+\end{IEEEkeywords}
+
+\section{Introdução}
+A migração de aplicações baseadas numa única unidade de código para arquiteturas distribuídas trouxe consigo a necessidade de empacotar software de forma reprodutível, leve e independente do ambiente de execução. Foi nesse contexto que a conteinerização ganhou força, oferecendo uma alternativa mais económica em recursos do que a virtualização tradicional baseada em monitores de máquinas virtuais. Estudos comparativos mostram que \textit{containers} Linux têm uma sobrecarga de CPU e memória próxima da execução nativa, ao contrário das máquinas virtuais \cite{bernstein2014,merkel2014,felter2015}.
+
+Um container é, na prática, um processo isolado por mecanismos do núcleo Linux, designadamente \textit{namespaces} e \textit{cgroups}, que partilha o sistema operativo do anfitrião mas mantém o seu próprio sistema de ficheiros, rede e árvore de processos \cite{bernstein2014}. Esta abordagem garante portabilidade entre ambientes de desenvolvimento, teste e produção e reduz a habitual fricção causada por dependências divergentes.
+
+Dentro do universo da gestão de \textit{containers} existem duas camadas que importa distinguir. A primeira é a do \textit{runtime} e empacotamento, responsável por construir imagens e executar \textit{containers} num anfitrião. A segunda é a da \textit{orquestração}, que coordena centenas ou milhares de \textit{containers} distribuídos por vários nós, tratando de escalonamento, rede, recuperação de falhas e atualizações progressivas. O Docker tornou-se a referência da primeira camada \cite{merkel2014}, ao passo que o Kubernetes consolidou-se como padrão de facto da segunda \cite{burns2016}. Compreender em que medida competem, ou se complementam, é o objetivo central deste trabalho.
+
+A Figura~\ref{fig:stack} ilustra esta separação de responsabilidades.
+
+\begin{figure}[t]
+\centering
+\begin{tikzpicture}[
+    layer/.style={rectangle, draw=black!70, rounded corners=2pt, minimum width=6.4cm, minimum height=0.55cm, font=\footnotesize},
+    label/.style={font=\scriptsize\itshape, text=black!60}
+]
+\node[layer, fill=blue!15] (app) {Aplicação / Microsserviços};
+\node[layer, fill=orange!20, below=2pt of app] (k8s) {Orquestração \textemdash{} Kubernetes};
+\node[layer, fill=green!20, below=2pt of k8s] (docker) {\textit{Runtime} e Imagens \textemdash{} Docker / containerd};
+\node[layer, fill=gray!20, below=2pt of docker] (os) {Sistema Operativo (Linux: namespaces, cgroups)};
+\node[layer, fill=gray!10, below=2pt of os] (hw) {Hardware / Máquina Virtual};
+\end{tikzpicture}
+\caption{Camadas da pilha de gestão de \textit{containers} e respetiva área de atuação do Docker e do Kubernetes.}
+\label{fig:stack}
+\end{figure}
+
+\section{Docker}
+O Docker surgiu em 2013 como projeto de código aberto e popularizou um modelo de empacotamento já existente em soluções como o LXC, tornando-o acessível através de uma interface de linha de comandos simples e de um formato de imagem padronizado \cite{merkel2014}. O seu impacto deveu-se menos a inovação tecnológica de raiz e mais à clareza do fluxo de trabalho: descrever a imagem num \textit{Dockerfile}, construir, publicar num registo e executar.
+
+\subsection{Arquitetura}
+A arquitetura segue um modelo cliente-servidor. O cliente \texttt{docker} comunica com um \textit{daemon} (\texttt{dockerd}), que por sua vez delega a execução em \textit{runtimes} de mais baixo nível, hoje tipicamente \texttt{containerd} e \texttt{runc}. As imagens são compostas por camadas só de leitura, armazenadas de forma eficiente e partilhadas entre \textit{containers} que delas dependem. Para coordenar múltiplos \textit{containers} numa mesma máquina, o Docker disponibiliza ainda o \textit{Docker Compose}, que descreve serviços, redes e volumes num único ficheiro declarativo.
+
+\subsection{Casos de Uso Típicos}
+O Docker é particularmente adequado a ambientes de desenvolvimento local, integração contínua, demonstrações reproduzíveis e implantações de pequena escala em servidor único. Em equipas pequenas, ou em projetos onde a complexidade da infraestrutura não justifica um plano de controlo dedicado, o conjunto Docker + Docker Compose cobre a maior parte das necessidades com uma curva de aprendizagem reduzida. É também a base sobre a qual os orquestradores correm, dado que o formato de imagem OCI, herdeiro do formato Docker, é universal entre plataformas \cite{pahl2019}.
+
+\section{Kubernetes}
+O Kubernetes foi tornado público pela Google em 2014 e doado à Cloud Native Computing Foundation (CNCF) em 2015. As suas raízes encontram-se nos sistemas internos \textit{Borg} e \textit{Omega}, usados há mais de uma década para gerir os serviços de produção da empresa \cite{verma2015,burns2016}. O objetivo desde o início foi abstrair o cluster como um único recurso computacional, no qual o utilizador declara o estado desejado e deixa ao sistema a tarefa de o manter.
+
+\subsection{Arquitetura}
+Um cluster Kubernetes é composto por um plano de controlo e por nós de trabalho. No plano de controlo encontram-se o \textit{API server}, que expõe a interface REST; o \textit{etcd}, base de dados chave-valor onde reside o estado do cluster; o \textit{scheduler}, responsável por decidir em que nó cada \textit{pod} deve correr; e o \textit{controller manager}, que executa os ciclos de reconciliação. Em cada nó de trabalho, o \textit{kubelet} comunica com um \textit{runtime} de \textit{containers} (em regra \texttt{containerd}) e o \textit{kube-proxy} cuida do encaminhamento de rede.
+
+Sobre esta base, o utilizador opera com objetos declarativos: \textit{Pods}, \textit{Deployments}, \textit{Services}, \textit{Ingress}, \textit{ConfigMaps}, \textit{Secrets} e \textit{PersistentVolumes}. O modelo é convergente, isto é, o sistema observa continuamente a diferença entre o estado atual e o estado declarado e atua para a anular.
+
+\subsection{Casos de Uso Típicos}
+Kubernetes destaca-se em cenários de produção com elevada exigência de disponibilidade, aumento automático do número de instâncias em execução, atualizações progressivas sem interrupção de serviço e implantações distribuídas por várias regiões. O inquérito anual de 2023 da CNCF indica que 84\% das organizações inquiridas usam ou avaliam o Kubernetes em produção, sinal de maturidade do ecossistema \cite{cncf2023}. É também a fundação sobre a qual assentam ofertas geridas como Google Kubernetes Engine (GKE), Elastic Kubernetes Service (EKS) e Azure Kubernetes Service (AKS), que reduzem o esforço operacional do plano de controlo \cite{pahl2019}.
+
+\section{Análise Comparativa}
+Apresentar Docker e Kubernetes como alternativas equivalentes é, em rigor, incorreto: o primeiro é um motor de \textit{containers}, o segundo um orquestrador. A comparação só faz sentido quando se confronta o conjunto Docker + Docker Compose, usado num único anfitrião ou num número reduzido de nós, com um cluster Kubernetes. É nessa fronteira que a decisão se coloca para a maioria das equipas.
+
+\subsection{Modelo Operacional}
+O Docker assenta num modelo imperativo, em que o programador descreve o serviço e o inicia. Kubernetes adota um modelo declarativo com reconciliação contínua. A diferença é sensível em produção: perante uma falha, o Docker reinicia o container segundo políticas locais, ao passo que o Kubernetes redistribui cargas entre nós e mantém o número de réplicas desejado, mesmo que um nó inteiro deixe de responder.
+
+\subsection{Desempenho e Sobrecarga}
+No plano da execução de \textit{containers} propriamente dita, ambos recorrem a \textit{runtimes} compatíveis com a especificação Open Container Initiative (OCI), norma aberta que define os formatos de imagem e de execução de \textit{containers}, pelo que o desempenho bruto é equivalente \cite{felter2015}. A diferença está na sobrecarga do plano de controlo: um cluster Kubernetes consome memória e CPU significativos só para se manter operacional, o que penaliza implantações pequenas. Para cargas de trabalho leves, executadas num único servidor, essa sobrecarga raramente compensa.
+
+\subsection{Usabilidade e Curva de Aprendizagem}
+Docker é amplamente reconhecido pela sua acessibilidade. Um programador produtivo em poucas horas constrói uma imagem, publica-a e executa-a. Kubernetes exige familiaridade com dezenas de objetos, com o seu modelo de rede e com ferramentas auxiliares como \textit{kubectl} e \textit{Helm}. Esta curva é apontada de forma recorrente como o principal obstáculo à adoção \cite{kratzke2017}.
+
+\subsection{Escalabilidade e Resiliência}
+É nesta dimensão que a assimetria entre as duas soluções se torna mais evidente. O Docker Compose suporta a replicação de serviços de forma limitada, circunscrita a um único anfitrião, sem mecanismos nativos de distribuição de carga entre múltiplas máquinas. O Kubernetes, por sua vez, disponibiliza o \textit{Horizontal Pod Autoscaler}, que ajusta automaticamente o número de instâncias de um serviço em função de métricas de utilização, e o \textit{Cluster Autoscaler}, que adiciona ou remove nós do cluster conforme a procura. Acrescem ainda as sondas de \textit{liveness} e \textit{readiness}, que permitem detetar e substituir instâncias com falhas sem intervenção manual, a distribuição geográfica por zonas de disponibilidade e as atualizações progressivas (\textit{rolling updates}), que garantem continuidade de serviço durante a implantação de novas versões. Para sistemas que necessitam de cumprir acordos de nível de serviço exigentes sob carga variável, o Kubernetes deixa de constituir uma opção e passa a ser um requisito.
+
+\subsection{Custo Operacional}
+O custo do Docker é essencialmente o do anfitrião que o executa. O Kubernetes acrescenta custos de plano de controlo, de monitorização, de armazenamento distribuído e, sobretudo, de pessoal qualificado. Em ofertas geridas na nuvem o esforço operacional baixa, mas o custo financeiro mantém-se relevante e deve ser confrontado com o valor que a orquestração entrega ao negócio.
+
+\subsection{Síntese}
+A Tabela~\ref{tab:comp} sintetiza os principais critérios analisados ao longo desta secção, permitindo uma leitura comparativa direta entre o conjunto Docker + Docker Compose e o Kubernetes nos eixos de modelo operacional, desempenho, usabilidade, escalabilidade, resiliência e custo.
+
+\begin{table}[t]
+\caption{Comparação sintética entre Docker (com Compose) e Kubernetes.}
+\label{tab:comp}
+\centering
+\renewcommand{\arraystretch}{1.15}
+\footnotesize
+\begin{tabular}{@{}p{2.1cm}p{2.5cm}p{2.6cm}@{}}
+\toprule
+\textbf{Critério} & \textbf{Docker + Compose} & \textbf{Kubernetes} \\
+\midrule
+Camada & \textit{Runtime} e empacotamento & Orquestração \\
+Modelo & Imperativo, local & Declarativo, distribuído \\
+Curva de aprendizagem & Baixa & Elevada \\
+Sobrecarga & Mínima & Significativa no plano de controlo \\
+Escalabilidade & Limitada a um anfitrião & Multi-nó, automática \\
+Resiliência & Reinício de \textit{containers} & Reconciliação, \textit{self-healing} \\
+Custo operacional & Reduzido & Elevado (mitigável em modo gerido) \\
+Cenário ideal & Desenvolvimento, CI, pequenas implantações & Produção distribuída, microsserviços em larga escala \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Critérios de Escolha}
+Da análise resultam algumas regras práticas. Para projetos de menor dimensão, como académicos ou provas de conceito, bem como aplicações com tráfego estável servidas a partir de um único servidor, Docker e Docker Compose continuam a ser a opção mais sensata. Quando o sistema cresce para várias dezenas de serviços, exige atualizações sem tempo de inatividade ou precisa de escalar de forma elástica perante picos imprevisíveis, a migração para Kubernetes justifica o investimento. Existe ainda um caminho intermédio frequentemente subestimado: usar Docker em ambiente local e Kubernetes apenas em produção, tirando partido do facto de a imagem ser a mesma artefacto entre os dois mundos.
+
+%------------------------------------------------------------------
+\section{Arquitetura Prática de Implantação}
+%------------------------------------------------------------------
+
+A descrição formal das duas tecnologias ganha relevância quando confrontada com os fluxos reais de trabalho que as equipas de desenvolvimento adotam no dia a dia. Esta secção detalha, de forma técnica, como Docker e Kubernetes se inserem num \textit{pipeline} completo, desde a criação do código até à sua execução em produção.
+
+\subsection{Fluxo de Desenvolvimento com Docker}
+
+O ponto de partida de qualquer projeto contentorizado é o \textit{Dockerfile}, um ficheiro de texto que descreve, instrução a instrução, o ambiente necessário para executar a aplicação. A partir dele, o comando \texttt{docker build} produz uma imagem imutável, estratificada em camadas reutilizáveis. Essa imagem é então publicada num registo — público, como o Docker Hub \cite{dockerdocs}, ou privado, alojado em infraestrutura própria ou num serviço gerido como o Amazon Elastic Container Registry.
+
+Localmente, o \textit{Docker Compose} orquestra múltiplos serviços num único ficheiro \texttt{docker-compose.yml}, definindo redes virtuais, volumes persistentes e dependências entre serviços. Este mecanismo cobre com eficácia a maioria dos cenários de desenvolvimento e de implantação em servidor único, eliminando a necessidade de ferramentas adicionais quando a escala não o justifica \cite{pahl2019}.
+
+\subsection{Fluxo de Implantação com Kubernetes}
+
+Quando a aplicação transita para produção distribuída, a imagem produzida pelo Docker permanece o artefacto central — apenas muda o motor que a executa. O Kubernetes lê essa imagem a partir do mesmo registo e instancia-a em \textit{Pods}, a unidade mínima de execução do cluster. Um objeto \textit{Deployment} declara quantas réplicas do \textit{Pod} devem existir em qualquer instante; o \textit{scheduler} decide em que nó cada réplica corre, respeitando restrições de recursos e políticas de afinidade.
+
+A exposição da aplicação ao exterior é tratada por objetos \textit{Service}, que providenciam um endereço estável e balanceamento de carga interno, e por \textit{Ingress}, que define as regras de encaminhamento HTTP/HTTPS a partir de um controlador de entrada. A escalabilidade horizontal é gerida pelo \textit{Horizontal Pod Autoscaler} com base em métricas de CPU, memória ou fontes externas. Em caso de falha de um nó, o \textit{controller manager} deteta a ausência das réplicas afetadas e reprograma-as noutros nós disponíveis, sem intervenção manual \cite{burns2016,k8sdocs}.
+
+\subsection{Coexistência no mesmo Pipeline}
+
+A Figura~\ref{fig:pipeline} ilustra a integração das duas tecnologias num único fluxo de \textit{continuous integration / continuous deployment} (CI/CD). O programador escreve o código e o \textit{Dockerfile}; o sistema de CI constrói e testa a imagem; o registo centraliza a sua distribuição; e o Kubernetes consome-a em produção. A imagem é o contrato entre os dois mundos: o mesmo artefacto que o programador executou localmente com \texttt{docker run} é o que o Kubernetes implanta no cluster, eliminando as diferenças de ambiente que historicamente afetavam os ciclos de entrega.
+
+\begin{figure}[t]
+\centering
+\begin{tikzpicture}[
+  node distance=0.45cm and 0.5cm,
+  box/.style={rectangle, draw=black!70, rounded corners=3pt,
+              minimum width=1.45cm, minimum height=0.65cm,
+              font=\scriptsize, align=center},
+  arr/.style={-{Stealth[length=4pt]}, thick, black!60},
+  grp/.style={rectangle, draw=black!40, dashed, rounded corners=4pt,
+              inner sep=4pt, fill=black!3}
+]
+% Nodes
+\node[box, fill=blue!15]  (dev)  {Desen-\\volvedor};
+\node[box, fill=green!15, right=of dev]  (df)   {Dockerfile\\+ Build};
+\node[box, fill=orange!15, right=of df]  (reg)  {Registo\\de Imagens};
+\node[box, fill=purple!15, right=of reg] (dep)  {Deployment\\YAML};
+\node[box, fill=teal!15,   right=of dep] (k8s)  {Cluster\\Kubernetes};
+
+% Arrows
+\draw[arr] (dev) -- (df);
+\draw[arr] (df)  -- node[above, font=\scriptsize\itshape]{push} (reg);
+\draw[arr] (reg) -- node[above, font=\scriptsize\itshape]{pull} (dep);
+\draw[arr] (dep) -- (k8s);
+
+% Sub-labels
+\node[font=\scriptsize\itshape, below=2pt of df,  text=black!55] {docker build};
+\node[font=\scriptsize\itshape, below=2pt of k8s, text=black!55] {Pods/Services};
+
+% Groups
+\begin{scope}[on background layer]
+  \node[grp, fit=(df)(reg), label={[font=\scriptsize, text=black!50]above:CI/CD}] {};
+  \node[grp, fit=(dep)(k8s), label={[font=\scriptsize, text=black!50]above:Produção}] {};
+\end{scope}
+\end{tikzpicture}
+\caption{Fluxo integrado de desenvolvimento e implantação: do \textit{Dockerfile} ao cluster Kubernetes, passando pelo registo de imagens.}
+\label{fig:pipeline}
+\end{figure}
+
+\subsection{Deployment Local vs.\ Distribuído}
+
+A Tabela~\ref{tab:deploy} compara os dois modelos de implantação segundo eixos operacionais relevantes para a tomada de decisão. O Docker Compose destaca-se pela simplicidade e rapidez de configuração; o Kubernetes pela robustez em ambiente distribuído.
+
+\begin{table}[t]
+\caption{Comparação entre implantação local com Docker Compose e implantação distribuída com Kubernetes.}
+\label{tab:deploy}
+\centering
+\renewcommand{\arraystretch}{1.15}
+\footnotesize
+\begin{tabular}{@{}p{2.0cm}p{2.6cm}p{2.6cm}@{}}
+\toprule
+\textbf{Aspeto} & \textbf{Docker Compose} & \textbf{Kubernetes} \\
+\midrule
+Ficheiro de config.\ & \texttt{docker-compose.yml} & Manifests YAML (\textit{Deployment}, \textit{Service}, \textit{Ingress}) \\
+Nós suportados & 1 (anfitrião único) & $N$ nós (cluster) \\
+Balanceamento & Não nativo & \textit{Service} + \textit{Ingress} \\
+Escalonamento & Manual (\texttt{--scale}) & Automático (HPA) \\
+\textit{Self-healing} & Reinício local & Reprogramação entre nós \\
+Configuração inicial & Minutos & Horas a dias \\
+Caso de uso típico & Desenvolvimento, CI, servidores únicos & Produção de média/grande escala \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+%------------------------------------------------------------------
+\section{Análise Comparativa Baseada na Literatura}%------------------------------------------------------------------
+
+Para complementar a análise teórica da secção anterior, apresentamos agora uma comparação quantitativa baseada em valores de referência reportados na literatura técnica e na documentação oficial das plataformas.
+
+Os dados aqui apresentados não resultam de medições laboratoriais próprias, mas sim de estimativas representativas compiladas a partir de estudos comparativos e documentação técnica especializada \cite{felter2015,pahl2019,kratzke2017,dockerdocs,k8sdocs}.
+
+
+\subsection{Métricas de Desempenho e Sobrecarga}
+
+A Tabela~\ref{tab:bench} resume as principais métricas de desempenho de ambas as ferramentas. Importa notar que os valores de recursos em estado ocioso (\textit{idle}) correspondem apenas ao "motor"  de cada solução (o \textit{daemon} no caso do Docker, e o plano de controlo no Kubernetes), sem contabilizar o consumo da aplicação em si.
+
+\begin{table}[t]
+\caption{Métricas comparativas representativas entre Docker Compose e Kubernetes (3 serviços, hardware padrão).}
+\label{tab:bench}
+\centering
+\renewcommand{\arraystretch}{1.2}
+\footnotesize
+\begin{tabular}{@{}p{2.3cm}p{2.2cm}p{2.2cm}@{}}
+\toprule
+\textbf{Métrica} & \textbf{Docker + Compose} & \textbf{Kubernetes} \\
+\midrule
+RAM \textit{idle} (plano controlo) & $\approx$\,50\,MiB & $\approx$\,700\,MiB--1\,GiB \\
+CPU \textit{idle} (plano controlo) & $<$\,1\,\% & 2--5\,\% \\
+Tempo de arranque (3 serviços) & 3--6\,s & 15--40\,s \\
+Tempo de recuperação pós-falha & 5--15\,s (restart local) & 20--60\,s (reprogramação) \\
+Réplicas máx.\ (1 nó, 8\,GiB) & $\approx$\,30--50 & $\approx$\,20--40 \\
+Réplicas máx.\ (10 nós) & N/A (anfitrião único) & $\approx$\,300--500 \\
+Suporte multi-nó & Não & Sim \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Análise Crítica dos Resultados}
+
+A Figura~\ref{fig:overhead} ilustra de forma clara o contraste no consumo de memória ociosa. Fica evidente que o Kubernetes exige um "custo de entrada" fixo e substancial em termos de infraestrutura.
+
+\begin{figure}[t]
+\centering
+\begin{tikzpicture}[font=\scriptsize]
+  % Axes
+  \draw[->] (0,0) -- (5.2,0) node[right] {Solução};
+  \draw[->] (0,0) -- (0,3.4) node[above] {RAM plano controlo (MiB)};
+
+  % Y ticks
+  \foreach \y/\lab in {0/0, 0.5/100, 1.0/200, 1.5/300, 2.0/400, 2.5/500, 3.0/600}{
+    \draw (0,\y) -- (-0.1,\y) node[left] {\lab};
+  }
+
+  % Bars
+  % Docker Compose: ~50 MiB -> scaled: 50/100*0.5 = 0.25
+  \fill[green!40, draw=black!60] (0.8,0) rectangle (2.0,0.25);
+  \node[above] at (1.4,0.25) {$\approx$50};
+
+  % Kubernetes: ~850 MiB -> scaled: 850/100*0.5 = 4.25 -> capped at 3
+  \fill[orange!50, draw=black!60] (2.8,0) rectangle (4.0,3.0);
+  \node[above] at (3.4,3.0) {$\approx$850};
+
+  % X labels
+  \node[below, align=center] at (1.4,-0.15) {Docker\\Compose};
+  \node[below, align=center] at (3.4,-0.15) {Kubernetes};
+\end{tikzpicture}
+\caption{Consumo de memória do plano de controlo em situação \textit{idle} (valores representativos em MiB).}
+\label{fig:overhead}
+\end{figure}
+
+A leitura destes dados permite-nos extrair três grandes conclusões suportadas pela literatura:
+
+\textbf{1. O Kubernetes tem um custo inicial elevado.} Antes mesmo de executar a primeira linha de código da aplicação, o plano de controlo do Kubernetes (que inclui o \textit{API server}, o \textit{etcd}, o \textit{scheduler} e o \textit{controller manager}) consome logo entre 700\,MiB e 1\,GiB de RAM \cite{k8sdocs}. Num servidor mais modesto (com 2 a 4\,GiB de RAM), esta sobrecarga pode inviabilizar o projeto.
+
+\textbf{2. O Docker Compose é melhor em eficiência local.} Como não precisa de inicializar nem de gerir um plano de controlo complexo, o Docker Compose é muito mais leve a nível de CPU e memória. Esta arquitetura direta traduz-se também num arranque quase imediato dos serviços. É, sem dúvida, a escolha ideal para o desenvolvimento local e para pequenas implantações em servidores únicos.
+
+\textbf{3. O Kubernetes é melhor na alta disponibilidade.} O maior consumo de recursos e a ligeira lentidão no arranque inicial do Kubernetes justificam-se plenamente assim que o sistema precisa de crescer. A capacidade de espalhar instâncias (\textit{pods}) por vários servidores permite escalar a aplicação de forma quase linear. Além disso, embora demore um pouco mais a reagir a uma falha isolada, a sua capacidade de recuperar automaticamente do "apagão" de um servidor inteiro é vital — um cenário para o qual o Docker Compose não tem resposta nativa. Para sistemas críticos, com metas rígidas de disponibilidade (como 99,9\,\%), o Kubernetes deixa de ser apenas uma opção e passa a ser uma necessidade técnica \cite{burns2016}.
+
+\section{Conclusões}
+Docker e Kubernetes não são, na sua essência, concorrentes, mas peças complementares de uma mesma cadeia. Ambos surgem em discussões sobre microsserviços e nuvem, mas atuam em camadas distintas: o Docker resolve o problema de empacotar e executar um container e o Kubernetes o problema de coordenar muitos. A decisão de adoção deve, por isso, ser guiada pela escala do sistema, pela tolerância a falhas exigida e pela capacidade da equipa, e não por modas ou pela mera disponibilidade de uma tecnologia. Em muitos cenários reais a resposta mais correta é, simplesmente, usar os dois.
+\newpage
+
+\begin{thebibliography}{00}
+\bibitem{merkel2014} D. Merkel, ``Docker: lightweight Linux \textit{containers} for consistent development and deployment,'' \textit{Linux Journal}, vol. 2014, n.º 239, art. 2, mar. 2014.
+\bibitem{bernstein2014} D. Bernstein, ``\textit{Containers} and cloud: From LXC to Docker to Kubernetes,'' \textit{IEEE Cloud Computing}, vol. 1, n.º 3, pp. 81--84, set. 2014.
+\bibitem{felter2015} W. Felter, A. Ferreira, R. Rajamony e J. Rubio, ``An updated performance comparison of virtual machines and Linux \textit{containers},'' em \textit{Proc. IEEE Int. Symp. Performance Analysis of Systems and Software (ISPASS)}, 2015, pp. 171--172.
+\bibitem{verma2015} A. Verma \textit{et al.}, ``Large-scale cluster management at Google with Borg,'' em \textit{Proc. 10th European Conf. on Computer Systems (EuroSys)}, 2015, art. 18.
+\bibitem{burns2016} B. Burns, B. Grant, D. Oppenheimer, E. Brewer e J. Wilkes, ``Borg, Omega, and Kubernetes,'' \textit{Communications of the ACM}, vol. 59, n.º 5, pp. 50--57, maio 2016.
+\bibitem{pahl2019} C. Pahl, A. Brogi, J. Soldani e P. Jamshidi, ``Cloud container technologies: A state-of-the-art review,'' \textit{IEEE Trans. Cloud Computing}, vol. 7, n.º 3, pp. 677--692, jul.--set. 2019.
+\bibitem{kratzke2017} N. Kratzke e P.-C. Quint, ``Understanding cloud-native applications after 10 years of cloud computing -- A systematic mapping study,'' \textit{Journal of Systems and Software}, vol. 126, pp. 1--16, abr. 2017.
+\bibitem{cncf2023} Cloud Native Computing Foundation, ``CNCF Annual Survey 2023,'' 2024. [Online]. Disponível em: https://www.cncf.io/reports/cncf-annual-survey-2023/
+\bibitem{dockerdocs} Docker Inc., ``Docker Documentation.'' [Online]. Disponível em: https://docs.docker.com/
+\bibitem{k8sdocs} The Kubernetes Authors, ``Kubernetes Documentation.'' [Online]. Disponível em: https://kubernetes.io/docs/
+\end{thebibliography}
+
+\end{document}
