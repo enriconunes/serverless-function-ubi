@@ -1,0 +1,670 @@
+<!doctype html>
+<html lang="pt-PT">
+<head>
+<meta charset="utf-8" />
+<title>Edge Functions Supabase — Apresentação</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<style>
+  :root{
+    --bg:        #0b0f1a;
+    --bg-card:   #131a2c;
+    --bg-card-2: #1a2238;
+    --text:      #e6e9f2;
+    --muted:     #8d97b3;
+    --accent:    #3ECF8E;
+    --accent-2:  #62d9ff;
+    --warn:      #ffb86b;
+    --danger:    #ff6b81;
+    --border:    rgba(255,255,255,0.08);
+    --shadow:    0 20px 60px rgba(0,0,0,0.45);
+    --mono:      'JetBrains Mono','Cascadia Code','Fira Code','SF Mono',Consolas,monospace;
+    --sans:      'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,system-ui,sans-serif;
+  }
+
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html,body{height:100%; overflow:hidden; background:var(--bg); color:var(--text); font-family:var(--sans);}
+  body{display:flex; align-items:center; justify-content:center;}
+
+  /* radial highlight no fundo */
+  body::before{
+    content:""; position:fixed; inset:0;
+    background:
+      radial-gradient(900px 600px at 80% 10%, rgba(62,207,142,0.10), transparent 60%),
+      radial-gradient(700px 500px at 20% 90%, rgba(98,217,255,0.08), transparent 60%);
+    pointer-events:none; z-index:0;
+  }
+
+  /* container 16:9 escalável */
+  .deck{
+    position:relative; width:min(95vw, calc(95vh * 16/9));
+    aspect-ratio: 16 / 9;
+    z-index:1;
+  }
+
+  .slide{
+    position:absolute; inset:0;
+    padding:48px 64px;
+    display:none; flex-direction:column;
+    opacity:0; transform:translateY(20px);
+    transition:opacity .35s ease, transform .35s ease;
+  }
+  .slide.active{display:flex; opacity:1; transform:none;}
+
+  .eyebrow{
+    font-size:13px; letter-spacing:0.18em; text-transform:uppercase;
+    color:var(--accent); font-weight:600; margin-bottom:14px;
+  }
+  h1{font-size:46px; line-height:1.1; font-weight:700; letter-spacing:-0.02em; margin-bottom:18px;}
+  h2{font-size:34px; line-height:1.15; font-weight:700; letter-spacing:-0.015em; margin-bottom:18px;}
+  h3{font-size:22px; line-height:1.25; font-weight:600; margin-bottom:8px;}
+  p{font-size:18px; line-height:1.55; color:var(--text);}
+  p.muted{color:var(--muted);}
+  .lead{font-size:21px; line-height:1.5; color:var(--muted); max-width:900px;}
+
+  /* === header + footer fixos === */
+  .topbar{
+    position:absolute; top:18px; left:64px; right:64px;
+    display:flex; justify-content:space-between; align-items:center;
+    font-size:12px; color:var(--muted); letter-spacing:0.04em;
+  }
+  .progress{
+    position:absolute; left:0; right:0; bottom:0; height:3px;
+    background:rgba(255,255,255,0.05);
+  }
+  .progress > div{
+    height:100%; background:linear-gradient(90deg,var(--accent),var(--accent-2));
+    transition:width .35s ease;
+  }
+  .counter{
+    position:absolute; bottom:18px; right:24px;
+    font-family:var(--mono); font-size:11px; color:var(--muted);
+  }
+
+  /* === slide de capa === */
+  .cover{justify-content:center; align-items:flex-start;}
+  .cover h1{font-size:60px; max-width:1000px;}
+  .cover .subtitle{font-size:22px; color:var(--muted); margin-top:8px; max-width:900px;}
+  .cover .authors{margin-top:auto; display:flex; gap:48px; padding-top:28px; border-top:1px solid var(--border); width:100%;}
+  .cover .author .name{font-weight:600; font-size:16px;}
+  .cover .author .role{font-size:13px; color:var(--muted); margin-top:2px;}
+
+  /* === cards & grids === */
+  .grid{display:grid; gap:16px;}
+  .grid.cols-3{grid-template-columns:repeat(3,1fr);}
+  .grid.cols-2{grid-template-columns:repeat(2,1fr);}
+  .grid.cols-4{grid-template-columns:repeat(4,1fr);}
+
+  .card{
+    background:var(--bg-card);
+    border:1px solid var(--border);
+    border-radius:14px;
+    padding:18px 20px;
+    box-shadow:var(--shadow);
+  }
+  .card .icon{
+    width:38px; height:38px; border-radius:10px;
+    display:grid; place-items:center; font-size:20px;
+    background:rgba(62,207,142,0.12); color:var(--accent);
+    margin-bottom:10px;
+  }
+  .card h3{font-size:17px;}
+  .card p{font-size:14px; color:var(--muted); line-height:1.45;}
+
+  .pill{
+    display:inline-block; padding:4px 10px; border-radius:999px;
+    background:rgba(62,207,142,0.12); color:var(--accent);
+    font-size:11px; letter-spacing:0.08em; text-transform:uppercase; font-weight:600;
+  }
+
+  /* === código === */
+  pre.code{
+    background:#0f1525;
+    border:1px solid var(--border);
+    border-radius:10px;
+    padding:16px 20px;
+    font-family:var(--mono); font-size:13px; line-height:1.55;
+    color:#cfd6ec; overflow:auto;
+  }
+  pre.code .kw{color:#c792ea;}
+  pre.code .str{color:#a5e3a5;}
+  pre.code .com{color:#7f8aac; font-style:italic;}
+  pre.code .fn{color:#82aaff;}
+  pre.code .num{color:#f78c6c;}
+  pre.code .var{color:#82d8ff;}
+
+  /* === arquitetura / flow === */
+  .flow{display:flex; align-items:center; gap:14px; flex-wrap:wrap; margin:16px 0;}
+  .flow .step{
+    background:var(--bg-card); border:1px solid var(--border); border-radius:10px;
+    padding:12px 16px; min-width:120px; text-align:center;
+  }
+  .flow .step .lbl{font-family:var(--mono); font-size:14px; color:var(--text);}
+  .flow .step .sub{font-size:11px; color:var(--muted); margin-top:2px;}
+  .flow .arrow{color:var(--muted); font-size:18px;}
+
+  /* cores especificas para o flow de deploy */
+  .step.s1{border-color:rgba(98,217,255,0.35);}
+  .step.s2{border-color:rgba(62,207,142,0.35);}
+  .step.s3{border-color:rgba(255,184,107,0.35);}
+  .step.s4{border-color:rgba(255,230,109,0.35);}
+  .step.s5{border-color:rgba(190,140,255,0.35);}
+  .step.s6{border-color:rgba(124,229,196,0.35);}
+
+  /* === stats / kpi === */
+  .kpis{display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-top:14px;}
+  .kpi{background:var(--bg-card); border:1px solid var(--border); border-radius:12px; padding:18px;}
+  .kpi .v{font-size:32px; font-weight:700; color:var(--accent); font-family:var(--mono);}
+  .kpi .v.warm{color:var(--accent);}
+  .kpi .v.cold{color:var(--warn);}
+  .kpi .v.bad{color:var(--danger);}
+  .kpi .k{font-size:12px; letter-spacing:0.08em; text-transform:uppercase; color:var(--muted); margin-top:6px;}
+
+  /* === split layout === */
+  .split{display:grid; grid-template-columns:1fr 1fr; gap:24px; flex:1;}
+  .split.flex{display:flex; gap:24px;}
+  .split > .pane{
+    background:var(--bg-card); border:1px solid var(--border);
+    border-radius:14px; padding:22px 24px;
+    display:flex; flex-direction:column;
+  }
+  .pane .big-num{
+    font-family:var(--mono); font-size:62px; font-weight:700;
+    background:linear-gradient(135deg,var(--accent),var(--accent-2));
+    -webkit-background-clip:text; background-clip:text; color:transparent;
+    line-height:1;
+  }
+
+  .figbox{
+    flex:1; display:flex; flex-direction:column;
+    background:var(--bg-card); border:1px solid var(--border);
+    border-radius:12px; padding:14px; min-height:0;
+  }
+  .figbox img{flex:1; min-height:0; object-fit:contain; border-radius:8px; background:#fff;}
+  .figbox .cap{font-size:12px; color:var(--muted); margin-top:8px;}
+
+  /* === request/response demo === */
+  .demo{display:grid; grid-template-columns:1fr 1fr; gap:18px; margin-top:8px;}
+  .demo .req, .demo .res{background:var(--bg-card); border:1px solid var(--border); border-radius:12px; padding:16px;}
+  .demo .req h3, .demo .res h3{font-size:13px; color:var(--muted); margin-bottom:8px; letter-spacing:0.08em; text-transform:uppercase;}
+  .demo pre{font-family:var(--mono); font-size:13px; line-height:1.6;}
+  .verb{display:inline-block; padding:2px 8px; border-radius:6px; font-family:var(--mono); font-size:12px; font-weight:600;}
+  .verb.post{background:rgba(98,217,255,0.18); color:var(--accent-2);}
+  .verb.ok  {background:rgba(62,207,142,0.18); color:var(--accent);}
+
+  /* === bullets visuais === */
+  .bullets{display:flex; flex-direction:column; gap:14px; margin-top:14px;}
+  .bullets li{list-style:none; display:flex; gap:14px; align-items:flex-start;}
+  .bullets li .dot{
+    flex:0 0 36px; height:36px; border-radius:10px; display:grid; place-items:center;
+    background:rgba(62,207,142,0.12); color:var(--accent); font-weight:700; font-family:var(--mono);
+  }
+  .bullets li .txt{font-size:17px; line-height:1.5;}
+  .bullets li .txt b{color:var(--text);}
+  .bullets li .txt span{color:var(--muted);}
+
+  /* tecnologias */
+  .tech-grid{display:grid; grid-template-columns:1fr 1fr; gap:10px 24px; margin-top:10px;}
+  .tech{display:flex; gap:14px; align-items:flex-start; padding:10px 0; border-bottom:1px solid var(--border);}
+  .tech:last-child{border-bottom:none;}
+  .tech .badge{
+    flex:0 0 auto; padding:4px 10px; border-radius:8px;
+    background:var(--bg-card-2); color:var(--accent);
+    font-family:var(--mono); font-size:12px; font-weight:600;
+    border:1px solid var(--border); min-width:120px; text-align:center;
+  }
+  .tech .desc{font-size:14px; color:var(--muted); line-height:1.45;}
+
+  /* navigação ajuda */
+  .help{position:fixed; bottom:14px; left:18px; font-size:11px; color:rgba(255,255,255,0.25); font-family:var(--mono); z-index:10;}
+  .help kbd{padding:1px 5px; border:1px solid rgba(255,255,255,0.18); border-radius:4px;}
+
+  /* slide final */
+  .end{align-items:center; justify-content:center; text-align:center;}
+  .end h1{font-size:80px; background:linear-gradient(135deg,var(--accent),var(--accent-2)); -webkit-background-clip:text; background-clip:text; color:transparent;}
+  .end p{font-size:20px; color:var(--muted); margin-top:10px;}
+  .end .repo{margin-top:18px; font-family:var(--mono); font-size:14px;}
+  .end .repo a{color:var(--accent); text-decoration:none; border-bottom:1px dotted var(--accent);}
+
+  /* responsive scaling */
+  @media (max-aspect-ratio:16/9){
+    .deck{width:95vw;}
+  }
+</style>
+</head>
+<body>
+
+<div class="deck" id="deck">
+
+  <!-- ============ 1: CAPA ============ -->
+  <section class="slide cover active">
+    <span class="pill">Computação na Nuvem · 2025/2026</span>
+    <h1 style="margin-top:18px;">Edge Functions do Supabase</h1>
+    <p class="subtitle">Geração <i>serverless</i> de números primos e análise experimental de latência e <i>cold start</i></p>
+
+    <div class="authors">
+      <div class="author">
+        <div class="name">Enrico Nunes</div>
+        <div class="role">Mestrado em Engenharia Informática · UBI</div>
+      </div>
+      <div class="author">
+        <div class="name">Marcos Assunção</div>
+        <div class="role">Mestrado em Engenharia Informática · UBI</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 2: OBJETIVO ============ -->
+  <section class="slide">
+    <div class="topbar"><span>Objetivo</span><span>1 · Contexto</span></div>
+    <div class="eyebrow">O Problema</div>
+    <h2>Função <i>serverless</i> que devolve todos os primos &lt; <span style="color:var(--accent); font-family:var(--mono);">n</span></h2>
+    <p class="lead">Implementação real numa plataforma de nuvem, com <i>deployment</i>, validação e medição de desempenho.</p>
+
+    <div class="grid cols-3" style="margin-top:30px;">
+      <div class="card">
+        <div class="icon">①</div>
+        <h3>Implementar</h3>
+        <p>Função que recebe <code>n</code> e devolve a lista de primos inferiores.</p>
+      </div>
+      <div class="card">
+        <div class="icon">②</div>
+        <h3>Implantar</h3>
+        <p>Publicar como <i>endpoint</i> HTTP em produção.</p>
+      </div>
+      <div class="card">
+        <div class="icon">③</div>
+        <h3>Medir</h3>
+        <p>Latência sequencial, concorrente e <i>cold start</i>.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 3: O QUE É SERVERLESS ============ -->
+  <section class="slide">
+    <div class="topbar"><span>Conceitos</span><span>2 · Serverless / FaaS</span></div>
+    <div class="eyebrow">Function as a Service</div>
+    <h2>Servidores existem — só deixam de ser problema teu</h2>
+
+    <div class="grid cols-3" style="margin-top:24px;">
+      <div class="card">
+        <div class="icon" style="background:rgba(98,217,255,0.12); color:var(--accent-2);">⚡</div>
+        <h3>Escala automática</h3>
+        <p>A plataforma instancia tantas cópias quantas as necessárias e remove-as quando a procura cai.</p>
+      </div>
+      <div class="card">
+        <div class="icon" style="background:rgba(255,184,107,0.12); color:var(--warn);">💰</div>
+        <h3>Pagamento por uso</h3>
+        <p>Cobrança ao milissegundo. Picos e funções pouco usadas são proporcionais; sem máquinas semipreenchidas.</p>
+      </div>
+      <div class="card">
+        <div class="icon" style="background:rgba(190,140,255,0.12); color:#be8cff;">🔌</div>
+        <h3>Sem estado</h3>
+        <p>Cada invocação é independente. O estado vive numa base de dados ou <i>cache</i> externa.</p>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:24px; border-color:rgba(255,107,129,0.35); background:rgba(255,107,129,0.06);">
+      <div style="display:flex; gap:14px; align-items:center;">
+        <div class="icon" style="background:rgba(255,107,129,0.18); color:var(--danger);">🥶</div>
+        <div>
+          <h3 style="margin-bottom:4px;">O preço a pagar: <i>cold start</i></h3>
+          <p style="font-size:15px;">Quando não há instância pronta, a plataforma tem de a provisionar antes de executar — primeiro pedido paga esse custo.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 4: TECNOLOGIAS ============ -->
+  <section class="slide">
+    <div class="topbar"><span>Stack</span><span>3 · Tecnologias</span></div>
+    <div class="eyebrow">Stack do Projeto</div>
+    <h2>Cada peça com um papel específico</h2>
+
+    <div class="tech-grid">
+      <div class="tech"><div class="badge">Supabase</div><div class="desc">Plataforma <i>serverless</i> com <i>Edge Functions</i> em rede global.</div></div>
+      <div class="tech"><div class="badge">Deno</div>    <div class="desc"><i>Runtime</i> de TypeScript com APIs web-standard e segurança por defeito.</div></div>
+      <div class="tech"><div class="badge">TypeScript</div><div class="desc">Linguagem da função; tipos estáticos sobre JavaScript.</div></div>
+      <div class="tech"><div class="badge">Supabase CLI</div><div class="desc">Ferramenta de <i>scaffolding</i> e <i>deployment</i> via <code>npx supabase</code>.</div></div>
+      <div class="tech"><div class="badge">Insomnia</div> <div class="desc">Cliente HTTP gráfico para validar pedidos contra a função.</div></div>
+      <div class="tech"><div class="badge">k6</div>       <div class="desc">Motor de <i>load testing</i> com modelo nativo de utilizadores virtuais.</div></div>
+      <div class="tech"><div class="badge">PowerShell</div><div class="desc"><i>Script</i> de medição de <i>cold start</i> com cronómetro de alta precisão.</div></div>
+      <div class="tech"><div class="badge">Python</div>   <div class="desc"><i>pandas</i> e <i>matplotlib</i> para agregação estatística e geração dos gráficos.</div></div>
+    </div>
+  </section>
+
+  <!-- ============ 5: ARQUITETURA ============ -->
+  <section class="slide">
+    <div class="topbar"><span>Como funciona</span><span>4 · Arquitetura</span></div>
+    <div class="eyebrow">Ciclo de uma invocação</div>
+    <h2>Do cliente ao <i>sandbox</i> Deno</h2>
+
+    <div class="flow" style="margin-top:30px; justify-content:center;">
+      <div class="step s1"><div class="lbl">Cliente HTTP</div><div class="sub">Insomnia / curl</div></div>
+      <div class="arrow">→</div>
+      <div class="step s2"><div class="lbl">Gateway</div><div class="sub">apikey + routing</div></div>
+      <div class="arrow">→</div>
+      <div class="step s3"><div class="lbl">Sandbox Deno</div><div class="sub">cold ou warm</div></div>
+      <div class="arrow">→</div>
+      <div class="step s4"><div class="lbl">Função primes</div><div class="sub">crivo · O(n log log n)</div></div>
+    </div>
+
+    <div class="grid cols-2" style="margin-top:34px;">
+      <div class="card">
+        <h3 style="color:var(--accent);">▶ Warm</h3>
+        <p><i>Worker</i> já provisionado. Resposta dominada pelo <i>round-trip</i> de rede até à <i>edge</i>.</p>
+      </div>
+      <div class="card">
+        <h3 style="color:var(--warn);">▶ Cold</h3>
+        <p>Sem <i>worker</i> pronto. Plataforma carrega código e inicializa <i>runtime</i> antes de servir.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 6: A FUNÇÃO ============ -->
+  <section class="slide">
+    <div class="topbar"><span>Implementação</span><span>5 · A função</span></div>
+    <div class="eyebrow">Crivo de Eratóstenes</div>
+    <h2>17 linhas de TypeScript no <i>edge</i></h2>
+
+<pre class="code"><span class="com">// Crivo de Eratóstenes: O(n log log n)</span>
+<span class="kw">function</span> <span class="fn">primesUpTo</span>(n: <span class="kw">number</span>): <span class="kw">number</span>[] {
+  <span class="kw">if</span> (n &lt; <span class="num">2</span>) <span class="kw">return</span> [];
+  <span class="kw">const</span> <span class="var">sieve</span> = <span class="kw">new</span> <span class="fn">Uint8Array</span>(n + <span class="num">1</span>);
+  <span class="kw">const</span> <span class="var">primes</span>: <span class="kw">number</span>[] = [];
+  <span class="kw">for</span> (<span class="kw">let</span> i = <span class="num">2</span>; i &lt;= n; i++) {
+    <span class="kw">if</span> (!sieve[i]) {
+      primes.<span class="fn">push</span>(i);
+      <span class="kw">for</span> (<span class="kw">let</span> j = i*i; j &lt;= n; j += i) sieve[j] = <span class="num">1</span>;
+    }
+  }
+  <span class="kw">return</span> primes;
+}</pre>
+
+    <p class="muted" style="margin-top:16px; font-size:15px;">
+      <code>Uint8Array</code> em vez de <code>boolean[]</code>: 1 <i>byte</i> por posição, memória contígua, otimizado pelo motor JavaScript.
+    </p>
+  </section>
+
+  <!-- ============ 7: DEPLOYMENT ============ -->
+  <section class="slide">
+    <div class="topbar"><span>Da máquina local ao edge</span><span>6 · Deployment</span></div>
+    <div class="eyebrow">npx supabase &lt;subcomando&gt;</div>
+    <h2>Seis passos da CLI</h2>
+
+    <div class="flow" style="margin-top:26px; justify-content:center;">
+      <div class="step s1"><div class="lbl">init</div></div>
+      <div class="arrow">→</div>
+      <div class="step s2"><div class="lbl">new</div></div>
+      <div class="arrow">→</div>
+      <div class="step s3"><div class="lbl">serve</div></div>
+      <div class="arrow">→</div>
+      <div class="step s4"><div class="lbl">link</div></div>
+      <div class="arrow">→</div>
+      <div class="step s5"><div class="lbl">config</div></div>
+      <div class="arrow">→</div>
+      <div class="step s6"><div class="lbl">deploy</div></div>
+    </div>
+    <p class="muted" style="text-align:center; margin-top:6px; font-size:13px;">local · · · · · · · · · · · · · · · · · · · produção</p>
+
+    <div class="card" style="margin-top:22px;">
+      <p style="font-size:14px;">Sem configuração extra, a primeira invocação devolveria <code style="color:var(--danger);">401 UNAUTHORIZED_NO_AUTH_HEADER</code>. Ajustámos <code>config.toml</code>:</p>
+<pre class="code" style="margin-top:10px;">[functions.primes]
+verify_jwt = <span class="kw">false</span>
+entrypoint = <span class="str">"./functions/primes/index.ts"</span></pre>
+    </div>
+  </section>
+
+  <!-- ============ 8: VALIDAÇÃO ============ -->
+  <section class="slide">
+    <div class="topbar"><span>Em produção</span><span>7 · Validação</span></div>
+    <div class="eyebrow">Função pública na edge</div>
+    <h2>Pedido HTTP no Insomnia</h2>
+
+    <div class="demo" style="flex:1;">
+      <div class="req">
+        <h3>Request</h3>
+<pre><span class="verb post">POST</span> <span style="color:var(--accent-2);">/functions/v1/primes</span>
+<span style="color:var(--muted);">Host: uuvyutktcuhpwlltquii.supabase.co
+apikey: sb_publishable_***
+Content-Type: application/json</span>
+
+{
+  "number": <span style="color:var(--warn);">10</span>
+}</pre>
+      </div>
+      <div class="res">
+        <h3>Response</h3>
+<pre><span class="verb ok">200 OK</span>
+<span style="color:var(--muted);">Content-Type: application/json</span>
+
+{
+  "primes": [<span style="color:var(--accent);">2, 3, 5, 7</span>]
+}</pre>
+      </div>
+    </div>
+
+    <p class="muted" style="margin-top:14px; font-size:14px;">Validação em dois passos: primeiro contra <code>hello-world</code> (controlo), depois contra <code>primes</code>. Estratégia que isola problemas de configuração de problemas no código.</p>
+  </section>
+
+  <!-- ============ 9: METODOLOGIA ============ -->
+  <section class="slide">
+    <div class="topbar"><span>Como medimos</span><span>8 · Metodologia</span></div>
+    <div class="eyebrow">Abordagem em duas etapas</div>
+    <h2>Geração → Análise</h2>
+
+    <div class="split" style="margin-top:18px;">
+      <div class="pane">
+        <span class="pill">Etapa 1</span>
+        <div class="big-num" style="margin-top:14px;">①</div>
+        <h3 style="margin-top:14px;">Geração de Dados</h3>
+        <p style="font-size:15px; color:var(--muted); margin-top:4px;">Pedidos reais contra a função em produção. Cada latência gravada em ficheiro.</p>
+
+        <ul class="bullets" style="margin-top:18px;">
+          <li><div class="dot">k6</div><div class="txt"><b>Latência sequencial e concorrente</b><br><span>Cenários parametrizados, VUs em rampa</span></div></li>
+          <li><div class="dot">PS</div><div class="txt"><b>Cold start</b><br><span>PowerShell, cronómetro de alta precisão</span></div></li>
+        </ul>
+      </div>
+
+      <div class="pane">
+        <span class="pill" style="background:rgba(98,217,255,0.12); color:var(--accent-2);">Etapa 2</span>
+        <div class="big-num" style="margin-top:14px; background:linear-gradient(135deg,var(--accent-2),#be8cff); -webkit-background-clip:text; background-clip:text; color:transparent;">②</div>
+        <h3 style="margin-top:14px;">Análise</h3>
+        <p style="font-size:15px; color:var(--muted); margin-top:4px;">Script Python lê os ficheiros, calcula percentis e gera gráficos.</p>
+
+        <ul class="bullets" style="margin-top:18px;">
+          <li><div class="dot" style="background:rgba(98,217,255,0.12); color:var(--accent-2);">pd</div><div class="txt"><b>pandas</b><br><span>Agregação, percentis (p50, p95, p99)</span></div></li>
+          <li><div class="dot" style="background:rgba(98,217,255,0.12); color:var(--accent-2);">📊</div><div class="txt"><b>matplotlib</b><br><span>Histogramas, barras agrupadas, séries temporais</span></div></li>
+        </ul>
+      </div>
+    </div>
+
+    <p class="muted" style="text-align:center; margin-top:14px; font-size:14px;">↑ Esta separação permite repetir a análise sobre os mesmos dados sem refazer a campanha de testes.</p>
+  </section>
+
+  <!-- ============ 10: TESTE 1 SEQUENCIAL ============ -->
+  <section class="slide">
+    <div class="topbar"><span>Teste 1 de 3</span><span>9 · Latência Sequencial</span></div>
+    <div class="eyebrow">Função aquecida, sem contenção</div>
+    <h2>1000 pedidos sequenciais, 1 utilizador</h2>
+
+    <p class="lead" style="margin-top:8px;">Cada pedido espera o anterior. Mede o melhor caso possível — sem fila, dominado pelo <i>round-trip</i> até à <i>edge</i>.</p>
+
+    <div class="kpis">
+      <div class="kpi"><div class="v">46<span style="font-size:18px;"> ms</span></div><div class="k">min</div></div>
+      <div class="kpi"><div class="v">67<span style="font-size:18px;"> ms</span></div><div class="k">p50 (mediana)</div></div>
+      <div class="kpi"><div class="v" style="color:var(--warn);">226<span style="font-size:18px;"> ms</span></div><div class="k">p95</div></div>
+      <div class="kpi"><div class="v" style="color:var(--danger);">259<span style="font-size:18px;"> ms</span></div><div class="k">p99</div></div>
+    </div>
+
+    <div class="card" style="margin-top:18px; border-color:rgba(255,184,107,0.25);">
+      <p style="font-size:15px;"><b style="color:var(--warn);">Observação:</b> o valor máximo registado foi <code>1843 ms</code> — quase com certeza o <b>primeiro pedido</b> do teste, executado contra um <i>worker</i> frio. Daí surgiu naturalmente o estudo do <i>cold start</i>.</p>
+    </div>
+  </section>
+
+  <!-- ============ 11: TESTE 2 CONCORRENTE ============ -->
+  <section class="slide">
+    <div class="topbar"><span>Teste 2 de 3</span><span>10 · Latência Concorrente</span></div>
+    <div class="eyebrow">Rampa de utilizadores virtuais</div>
+    <h2>Crescimento gradual: 1 → 100 VUs em 6 fases</h2>
+
+    <div class="split flex" style="margin-top:14px;">
+      <div style="flex:0 0 38%; display:flex; flex-direction:column; gap:10px;">
+        <div class="flow" style="flex-direction:column; align-items:stretch; gap:6px;">
+          <div class="step s1" style="text-align:left;"><div class="lbl">Stage 1 · 30s</div><div class="sub">1 → 5 VUs</div></div>
+          <div class="step s2" style="text-align:left;"><div class="lbl">Stage 2 · 30s</div><div class="sub">5 → 10 VUs</div></div>
+          <div class="step s3" style="text-align:left;"><div class="lbl">Stage 3 · 30s</div><div class="sub">10 → 25 VUs</div></div>
+          <div class="step s4" style="text-align:left;"><div class="lbl">Stage 4 · 30s</div><div class="sub">25 → 50 VUs</div></div>
+          <div class="step s5" style="text-align:left;"><div class="lbl">Stage 5 · 30s</div><div class="sub">50 → 100 VUs</div></div>
+          <div class="step s6" style="text-align:left;"><div class="lbl">Stage 6 · 30s</div><div class="sub">100 → 0 VUs</div></div>
+        </div>
+      </div>
+      <div class="figbox">
+        <img src="figs/latency_stages.png" alt="Latência por stage" />
+        <div class="cap">Latência (p50, p95, p99) por <i>stage</i> da rampa</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 12: CONCORRENTE - RESULTADO ============ -->
+  <section class="slide">
+    <div class="topbar"><span>Teste 2 — resultado</span><span>10 · Latência Concorrente</span></div>
+    <div class="eyebrow">77 497 pedidos agregados</div>
+    <h2>A função escala de forma quase plana</h2>
+
+    <div class="kpis">
+      <div class="kpi"><div class="v">64<span style="font-size:18px;"> ms</span></div><div class="k">p50</div></div>
+      <div class="kpi"><div class="v">72<span style="font-size:18px;"> ms</span></div><div class="k">média</div></div>
+      <div class="kpi"><div class="v">113<span style="font-size:18px;"> ms</span></div><div class="k">p95</div></div>
+      <div class="kpi"><div class="v" style="color:var(--warn);">187<span style="font-size:18px;"> ms</span></div><div class="k">p99</div></div>
+    </div>
+
+    <div class="grid cols-2" style="margin-top:18px;">
+      <div class="card">
+        <h3 style="color:var(--accent);">✓ Mediana estável</h3>
+        <p>O pedido típico mantém-se em ~64 ms mesmo com 100 utilizadores em paralelo.</p>
+      </div>
+      <div class="card">
+        <h3 style="color:var(--accent-2);">✓ Cauda contida</h3>
+        <p>p95 = 113 ms — apenas 5% dos pedidos passa este valor. A degradação concentra-se na cauda.</p>
+      </div>
+    </div>
+
+    <p class="muted" style="margin-top:14px; font-size:14px;">↑ Confirma a tese do modelo <i>serverless</i>: a plataforma aprovisiona capacidade sob procura e amortiza-a enquanto há tráfego.</p>
+  </section>
+
+  <!-- ============ 13: TESTE 3 COLD START ============ -->
+  <section class="slide">
+    <div class="topbar"><span>Teste 3 de 3</span><span>11 · Cold Start</span></div>
+    <div class="eyebrow">A penalidade do primeiro pedido</div>
+    <h2>1 requisição a cada 15 min, durante 10 vezes</h2>
+
+    <div class="split flex" style="margin-top:14px;">
+      <div style="flex:0 0 36%;">
+        <ul class="bullets">
+          <li><div class="dot">10</div><div class="txt"><b>Iterações</b><br><span>Cada uma com um par cold + warm</span></div></li>
+          <li><div class="dot">15<span style="font-size:11px;">m</span></div><div class="txt"><b>Espera entre iterações</b><br><span>Tempo após o qual o <i>worker</i> Deno é reciclado por inatividade</span></div></li>
+          <li><div class="dot">⏱</div><div class="txt"><b>Cronómetro PowerShell</b><br><span>System.Diagnostics.Stopwatch, precisão sub-ms</span></div></li>
+        </ul>
+        <p class="muted" style="margin-top:18px; font-size:14px;">k6 não serve aqui — mantém ligações TCP/TLS persistentes que impedem o <i>worker</i> de ser reciclado.</p>
+      </div>
+      <div class="figbox">
+        <img src="figs/cold_start.png" alt="Cold vs warm por iteração" />
+        <div class="cap">Cold (vermelho) vs warm imediato (verde) — a diferença é o custo de provisionamento.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 14: RESULTADOS CHAVE ============ -->
+  <section class="slide">
+    <div class="topbar"><span>O que importa</span><span>12 · Resultados</span></div>
+    <div class="eyebrow">Conclusões da análise</div>
+    <h2>Três resultados que definem o trabalho</h2>
+
+    <div class="grid cols-3" style="margin-top:22px;">
+      <div class="card">
+        <div class="kpi" style="padding:0; border:none; background:transparent;">
+          <div class="v">67 ms</div>
+          <div class="k">Mediana warm</div>
+        </div>
+        <p style="margin-top:14px;">Latência dominada pela rede até à <i>edge</i>. A função em si é negligível.</p>
+      </div>
+      <div class="card">
+        <div class="kpi" style="padding:0; border:none; background:transparent;">
+          <div class="v" style="color:var(--accent-2);">100 VUs</div>
+          <div class="k">Sem saturação</div>
+        </div>
+        <p style="margin-top:14px;">Escalou de forma plana. Apenas 0.5% dos pedidos apanhou <i>rate limiting</i> do plano free.</p>
+      </div>
+      <div class="card">
+        <div class="kpi" style="padding:0; border:none; background:transparent;">
+          <div class="v" style="color:var(--warn);">Cold &gt;&gt; warm</div>
+          <div class="k">Penalidade reproduzível</div>
+        </div>
+        <p style="margin-top:14px;">Cold start várias vezes superior ao warm em todas as 10 iterações — o <i>trade-off</i> central do modelo.</p>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:22px; background:rgba(62,207,142,0.06); border-color:rgba(62,207,142,0.25);">
+      <h3 style="color:var(--accent);">Em uma frase</h3>
+      <p style="font-size:18px;">A plataforma cumpre a promessa do modelo <i>serverless</i> em regime estacionário, mas o utilizador paga a elasticidade no primeiro pedido após inatividade.</p>
+    </div>
+  </section>
+
+  <!-- ============ 15: FIM ============ -->
+  <section class="slide end">
+    <h1>Obrigado.</h1>
+    <p>Perguntas?</p>
+    <div class="repo">
+      <a href="https://github.com/enriconunes/serverless-function-ubi" target="_blank">
+        github.com/enriconunes/serverless-function-ubi
+      </a>
+    </div>
+  </section>
+
+</div>
+
+<div class="counter" id="counter">1 / 15</div>
+<div class="progress"><div id="bar" style="width:6.6%"></div></div>
+
+<div class="help">
+  <kbd>←</kbd> <kbd>→</kbd> navegar &nbsp; · &nbsp; <kbd>F</kbd> fullscreen &nbsp; · &nbsp; <kbd>Home</kbd>/<kbd>End</kbd>
+</div>
+
+<script>
+(function(){
+  const slides = Array.from(document.querySelectorAll('.slide'));
+  const counter = document.getElementById('counter');
+  const bar     = document.getElementById('bar');
+  let i = 0;
+
+  function render(){
+    slides.forEach((s, idx) => s.classList.toggle('active', idx === i));
+    counter.textContent = (i+1) + ' / ' + slides.length;
+    bar.style.width = ((i+1) / slides.length * 100) + '%';
+  }
+  function go(n){
+    i = Math.max(0, Math.min(slides.length-1, n));
+    render();
+  }
+  document.addEventListener('keydown', (e) => {
+    if (['ArrowRight','PageDown',' '].includes(e.key)) { e.preventDefault(); go(i+1); }
+    else if (['ArrowLeft','PageUp'].includes(e.key))   { e.preventDefault(); go(i-1); }
+    else if (e.key === 'Home')                          { e.preventDefault(); go(0); }
+    else if (e.key === 'End')                           { e.preventDefault(); go(slides.length-1); }
+    else if (e.key.toLowerCase() === 'f') {
+      if (!document.fullscreenElement) document.documentElement.requestFullscreen();
+      else document.exitFullscreen();
+    }
+  });
+  // click esquerdo/direito para navegar
+  document.addEventListener('click', (e) => {
+    if (e.target.closest('a,button,kbd,input')) return;
+    const x = e.clientX / window.innerWidth;
+    if (x > 0.7) go(i+1);
+    else if (x < 0.3) go(i-1);
+  });
+  render();
+})();
+</script>
+</body>
+</html>
